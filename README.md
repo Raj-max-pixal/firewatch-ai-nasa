@@ -58,7 +58,7 @@ Copy `.env.example` to `.env`, then add a FIRMS MAP key:
 ```env
 FIRMS_MAP_KEY=your_map_key
 FIRMS_AREA=74,8,81,14
-FIRMS_DAY_RANGE=10
+FIRMS_DAY_RANGE=5
 DATABASE_URL=postgresql://user:password@host:5432/firewatch
 ```
 

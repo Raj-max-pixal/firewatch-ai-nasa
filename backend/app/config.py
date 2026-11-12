@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     firms_map_key: str = ""
     firms_area: str = "74,8,81,14"
-    firms_day_range: int = 10
+    firms_day_range: int = 5
     gemini_api_key: str = ""
     allowed_origins: str = "http://localhost:5173"
     database_url: str = ""

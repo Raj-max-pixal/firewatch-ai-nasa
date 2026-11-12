@@ -18,7 +18,7 @@ services:
       - key: FIRMS_AREA
         value: 74,8,81,14
       - key: FIRMS_DAY_RANGE
-        value: "10"
+        value: "5"
       - key: AUTO_INIT_DATABASE
         value: "true"
       - key: ALLOWED_ORIGINS
