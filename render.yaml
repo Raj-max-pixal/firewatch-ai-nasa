@@ -17,6 +17,8 @@ services:
         sync: false
       - key: FIRMS_AREA
         value: 74,8,81,14
+      - key: FIRMS_REGION_LABEL
+        value: Tamil Nadu, India
       - key: FIRMS_DAY_RANGE
         value: "5"
       - key: GEMINI_API_KEY

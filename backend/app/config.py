@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     firms_map_key: str = ""
     firms_area: str = "74,8,81,14"
+    firms_region_label: str = "Tamil Nadu, India"
     firms_day_range: int = 5
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.8-flash"

@@ -24,8 +24,7 @@ def harmonize(frame: pd.DataFrame, sensor: str | None = None, source: str = "NAS
     """Normalize source records while retaining sensor provenance and traceability."""
     data = frame.copy()
     aliases = {
-        "acq_date": "date", "acq_time": "time", "bright_ti4": "brightness",
-        "bright_t31": "brightness", "satellite": "satellite", "instrument": "instrument",
+        "acq_date": "date", "acq_time": "time",
     }
     data = data.rename(columns={k: v for k, v in aliases.items() if k in data.columns})
     if "acquired" not in data:

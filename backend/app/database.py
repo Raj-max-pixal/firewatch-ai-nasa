@@ -80,7 +80,14 @@ def load_observations(limit: int = 50000) -> pd.DataFrame:
         rows = connection.execute(
             """select source_record_id as id, latitude, longitude, acquired_at as acquired,
                       sensor as satellite, confidence, frp_mw as frp, region, source
-               from fire_observations order by acquired_at desc limit %s""",
+               from fire_observations
+               where source = (
+                 select source from ingestion_runs
+                 where status = 'completed'
+                 order by completed_at desc nulls last, started_at desc
+                 limit 1
+               )
+               order by acquired_at desc limit %s""",
             (limit,),
         ).fetchall()
     return pd.DataFrame(rows)

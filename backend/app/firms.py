@@ -18,5 +18,7 @@ def fetch_firms() -> pd.DataFrame:
             url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{settings.firms_map_key}/{product}/{settings.firms_area}/{settings.firms_day_range}"
             response = client.get(url)
             response.raise_for_status()
-            frames.append(harmonize(pd.read_csv(StringIO(response.text)), sensor=sensor))
+            raw = pd.read_csv(StringIO(response.text))
+            raw["region"] = settings.firms_region_label
+            frames.append(harmonize(raw, sensor=sensor))
     return pd.concat(frames, ignore_index=True)

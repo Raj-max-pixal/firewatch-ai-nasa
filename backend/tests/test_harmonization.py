@@ -24,6 +24,20 @@ def test_invalid_coordinates_are_rejected():
     assert len(harmonize(source, sensor="MODIS")) == 1
 
 
+def test_modis_brightness_columns_do_not_collide():
+    source = pd.DataFrame([{
+        "latitude": 11,
+        "longitude": 77,
+        "acq_date": "2026-11-12",
+        "acq_time": 421,
+        "brightness": 320,
+        "bright_t31": 290,
+    }])
+    result = harmonize(source, sensor="MODIS")
+    assert result.columns.is_unique
+    assert len(result) == 1
+
+
 def test_database_has_safe_disabled_mode(monkeypatch):
     monkeypatch.setattr(settings, "database_url", "")
     assert database.enabled() is False
