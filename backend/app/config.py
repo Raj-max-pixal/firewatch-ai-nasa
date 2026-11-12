@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     firms_area: str = "74,8,81,14"
     firms_day_range: int = 5
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.8-flash"
     allowed_origins: str = "http://localhost:5173"
     database_url: str = ""
     auto_init_database: bool = True

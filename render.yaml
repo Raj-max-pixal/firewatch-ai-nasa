@@ -19,6 +19,10 @@ services:
         value: 74,8,81,14
       - key: FIRMS_DAY_RANGE
         value: "5"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
       - key: AUTO_INIT_DATABASE
         value: "true"
       - key: ALLOWED_ORIGINS

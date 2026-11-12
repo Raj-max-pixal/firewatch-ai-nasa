@@ -16,6 +16,7 @@ from reportlab.pdfgen import canvas
 
 from .config import settings
 from .firms import fetch_firms
+from .gemini import generate_fire_analysis
 from .harmonization import aggregate_activity, harmonize, records
 from . import database
 
@@ -185,14 +186,33 @@ def analysis(request: AnalysisRequest):
     data, source = observations()
     data = filtered(data, None, request.region.split(",")[0])
     stats = anomaly_payload(data)
-    answer = (
+    mean_frp = round(float(data.frp.mean()), 1) if len(data) else 0
+    evidence = {
+        "data_source": source,
+        "observation_count": len(data),
+        "viirs_count": int((data.satellite == "VIIRS").sum()),
+        "modis_count": int((data.satellite == "MODIS").sum()),
+        "mean_frp_mw": mean_frp,
+        "latest_day_detections": stats["current"],
+        "recent_daily_baseline": stats["baseline"],
+        "z_score": stats["z_score"],
+        "classification": stats["classification"],
+    }
+    fallback = (
         f"The selected view contains {len(data)} {source} observations: "
         f"{int((data.satellite == 'VIIRS').sum())} VIIRS and {int((data.satellite == 'MODIS').sum())} MODIS. "
-        f"Mean reported FRP is {data.frp.mean():.1f} MW. The latest day has {stats['current']} detections "
+        f"Mean reported FRP is {mean_frp:.1f} MW. The latest day has {stats['current']} detections "
         f"against a recent daily baseline of {stats['baseline']}. This is descriptive analysis of satellite "
         "thermal detections, not a fire prediction or verified incident assessment."
     )
-    return {"answer": answer, "source": source, "ai_generated": False, "question": request.question}
+    generated = generate_fire_analysis(request.question, request.region, evidence)
+    return {
+        "answer": generated or fallback,
+        "source": source,
+        "ai_generated": bool(generated),
+        "question": request.question,
+        "evidence": evidence,
+    }
 
 
 class ReportRequest(BaseModel):
