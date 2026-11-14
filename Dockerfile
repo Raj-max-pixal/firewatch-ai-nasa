@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY index.html tsconfig.json vite.config.ts ./
 COPY src ./src
+COPY public ./public
 RUN npm run build
 
 FROM python:3.13-slim
