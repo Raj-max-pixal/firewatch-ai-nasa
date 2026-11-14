@@ -31,13 +31,34 @@ create table if not exists fire_observations (
   unique(source, sensor, source_record_id)
 );
 
+create table if not exists app_users (
+  id bigserial primary key,
+  name text not null check (char_length(name) between 2 and 80),
+  email text not null unique,
+  password_hash text not null,
+  created_at timestamptz not null default now(),
+  last_login_at timestamptz
+);
+
+create table if not exists auth_sessions (
+  id bigserial primary key,
+  user_id bigint not null references app_users(id) on delete cascade,
+  token_hash text not null unique,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+
 create index if not exists fire_observations_acquired_idx on fire_observations(acquired_at desc);
 create index if not exists fire_observations_sensor_time_idx on fire_observations(sensor, acquired_at desc);
 create index if not exists fire_observations_grid_time_idx on fire_observations(grid_cell, acquired_at desc);
 create index if not exists fire_observations_region_idx on fire_observations(region);
+create index if not exists auth_sessions_user_idx on auth_sessions(user_id);
+create index if not exists auth_sessions_expiry_idx on auth_sessions(expires_at);
 
 alter table ingestion_runs enable row level security;
 alter table fire_observations enable row level security;
+alter table app_users enable row level security;
+alter table auth_sessions enable row level security;
 
 create or replace view fire_activity_daily with (security_invoker = true) as
 select
@@ -53,12 +74,12 @@ group by 1, 2, 3;
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
-    revoke all on ingestion_runs, fire_observations, fire_activity_daily from anon;
-    revoke all on sequence ingestion_runs_id_seq from anon;
+    revoke all on ingestion_runs, fire_observations, fire_activity_daily, app_users, auth_sessions from anon;
+    revoke all on sequence ingestion_runs_id_seq, app_users_id_seq, auth_sessions_id_seq from anon;
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
-    revoke all on ingestion_runs, fire_observations, fire_activity_daily from authenticated;
-    revoke all on sequence ingestion_runs_id_seq from authenticated;
+    revoke all on ingestion_runs, fire_observations, fire_activity_daily, app_users, auth_sessions from authenticated;
+    revoke all on sequence ingestion_runs_id_seq, app_users_id_seq, auth_sessions_id_seq from authenticated;
   end if;
 end $$;
 

@@ -3,12 +3,15 @@ import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaf
 import {
   Activity, AlertTriangle, ArrowUpRight, CalendarDays, ChevronDown, ChevronLeft,
   ChevronRight, CircleHelp, Crosshair, Download, Flame, Layers3, MapPin, Menu,
-  Radio, Search, Satellite, SlidersHorizontal, Sparkles, X
+  Eye, EyeOff, LogIn, LogOut, Mail, Radio, Search, Satellite, ShieldCheck,
+  SlidersHorizontal, Sparkles, UserPlus, X
 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { FireObservation } from './types';
+import firewatchLogo from './assets/firewatch-logo.png';
 
 type Tab = 'Overview' | 'Fire map' | 'Activity calendar' | 'Analytics' | 'Alert center' | 'Methodology';
+type AppUser = {id:number;name:string;email:string};
 
 const demo: FireObservation[] = [
   ['S-001',11.0168,76.9558,'2026-11-12T04:21:00Z','VIIRS',91,18.4,'Tamil Nadu'],
@@ -62,12 +65,35 @@ function App() {
   const [mobileNav, setMobileNav] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [currentUser, setCurrentUser] = useState<AppUser|null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/fires').then(r => r.ok ? r.json() : Promise.reject()).then(data => {
       if (data.fires?.length) { setFires(data.fires); setSource(data.source); }
     }).catch(() => setError('Backend offline · using bundled demonstration data'));
   }, []);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    fetch('/api/auth/me', {credentials:'include'})
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        if (data.user) setCurrentUser(data.user);
+        else if (sessionStorage.getItem('firewatch_guest') !== '1') timer = setTimeout(() => setAuthOpen(true), 3000);
+      })
+      .catch(() => {
+        if (sessionStorage.getItem('firewatch_guest') !== '1') timer = setTimeout(() => setAuthOpen(true), 3000);
+      });
+    return () => { if (timer) clearTimeout(timer); };
+  }, []);
+
+  async function signOut() {
+    await fetch('/api/auth/logout', {method:'POST', credentials:'include'}).catch(() => undefined);
+    setCurrentUser(null);
+    sessionStorage.removeItem('firewatch_guest');
+    setAuthOpen(true);
+  }
 
   const visible = useMemo(() => fires.filter(f =>
     (sensor === 'All sensors' || f.satellite === sensor) &&
@@ -111,14 +137,14 @@ function App() {
 
   return <div className="app-shell">
     <aside className={`sidebar ${mobileNav?'open':''}`}>
-      <div className="brand"><span className="brand-icon"><Flame size={19} fill="currentColor"/></span><div><strong>FIREWATCH <em>AI</em></strong><small>EARTH INTELLIGENCE</small></div><button className="icon-button close" onClick={()=>setMobileNav(false)}><X size={18}/></button></div>
+      <div className="brand"><span className="brand-icon"><img src={firewatchLogo} alt=""/></span><div><strong>FIREWATCH <em>AI</em></strong><small>EARTH INTELLIGENCE</small></div><button className="icon-button close" onClick={()=>setMobileNav(false)}><X size={18}/></button></div>
       <span className="section-label">WORKSPACE</span>
       <nav>{nav.map(([name,Icon]) => <button key={name} className={tab===name?'active':''} onClick={()=>{setTab(name);setMobileNav(false)}}><Icon size={17}/><span>{name}</span>{name==='Alert center'&&<b>3</b>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="status-card"><div><i className="pulse"/> SYSTEM STATUS <span>{source==='NASA FIRMS'?'LIVE':'DEMO'}</span></div><strong>{source==='NASA FIRMS'?'NASA FIRMS connected':'Sample mode active'}</strong><div className="status-line"><i/></div><small>MODIS + VIIRS processing ready</small></div><div className="profile"><span>FW</span><div><strong>Firewatch Analyst</strong><small>Research workspace</small></div><ChevronDown size={14}/></div></div>
+      <div className="sidebar-bottom"><div className="status-card"><div><i className="pulse"/> SYSTEM STATUS <span>{source==='NASA FIRMS'?'LIVE':'DEMO'}</span></div><strong>{source==='NASA FIRMS'?'NASA FIRMS connected':'Sample mode active'}</strong><div className="status-line"><i/></div><small>MODIS + VIIRS processing ready</small></div><div className="profile"><span>{currentUser?initials(currentUser.name):'FW'}</span><div><strong>{currentUser?.name||'Guest analyst'}</strong><small>{currentUser?.email||'Research workspace'}</small></div><button className="icon-button" title={currentUser?'Sign out':'Sign in'} onClick={currentUser?signOut:()=>setAuthOpen(true)}>{currentUser?<LogOut size={14}/>:<LogIn size={14}/>}</button></div></div>
     </aside>
     {mobileNav && <button className="scrim" onClick={()=>setMobileNav(false)} aria-label="Close navigation"/>}
     <main>
-      <header className="topbar"><div><button className="icon-button menu" onClick={()=>setMobileNav(true)}><Menu size={20}/></button><span>Monitoring</span><i>/</i><strong>{tab}</strong></div><div><span className="feed"><i className="pulse"/>{source==='NASA FIRMS'?'LIVE FEED':'DEMO FEED'}</span><span className="user-avatar">A</span></div></header>
+      <header className="topbar"><div><button className="icon-button menu" onClick={()=>setMobileNav(true)}><Menu size={20}/></button><span>Monitoring</span><i>/</i><strong>{tab}</strong></div><div><span className="feed"><i className="pulse"/>{source==='NASA FIRMS'?'LIVE FEED':'DEMO FEED'}</span><button className="user-avatar" title={currentUser?'Account':'Sign in'} onClick={()=>setAuthOpen(true)}>{currentUser?initials(currentUser.name):<LogIn size={13}/>}</button></div></header>
       <div className="page">
         <div className="page-heading"><div><span className="eyebrow">NASA SPACE APPS · 2026</span><h1>{tab === 'Overview' ? 'Fire intelligence, in focus.' : tab}</h1><p>{subtitle(tab)}</p></div><div className="heading-actions"><button className="button secondary" onClick={()=>downloadReport('csv')}><Download size={15}/> Export CSV</button><button className="button primary" onClick={refresh} disabled={loading}><Radio size={15} className={loading?'spin':''}/>{loading?'Refreshing…':'Refresh data'}</button></div></div>
         <div className={`data-banner ${source==='sample'?'demo':''}`}><Satellite size={16}/><span><b>{source==='sample'?'DEMONSTRATION DATA':'NASA FIRMS DATA'}</b> · {source==='sample'?'Bundled synthetic observations — not live NASA detections':'Retrieved by the backend using a server-side FIRMS key'}</span><button onClick={()=>setTab('Methodology')}>Data notes <ChevronRight size={13}/></button></div>
@@ -131,9 +157,67 @@ function App() {
         {tab === 'Analytics' && <Analytics fires={visible} stats={stats}/>} 
         {tab === 'Alert center' && <Alerts fires={visible} area={area}/>} 
         {tab === 'Methodology' && <Methodology source={source}/>} 
-        <footer><span><Flame size={13}/> FIREWATCH AI · NASA SPACE APPS 2026</span><p>For research and situational awareness. Not an operational emergency service.</p><button onClick={()=>setTab('Methodology')}>Methodology & limitations</button></footer>
+        <footer><span><img className="footer-logo" src={firewatchLogo} alt=""/> FIREWATCH AI · NASA SPACE APPS 2026</span><p>For research and situational awareness. Not an operational emergency service.</p><button onClick={()=>setTab('Methodology')}>Methodology & limitations</button></footer>
       </div>
     </main>
+    {authOpen && <AuthModal
+      user={currentUser}
+      onClose={()=>setAuthOpen(false)}
+      onAuthenticated={user=>{setCurrentUser(user);sessionStorage.removeItem('firewatch_guest');setAuthOpen(false)}}
+      onGuest={()=>{sessionStorage.setItem('firewatch_guest','1');setAuthOpen(false)}}
+      onSignOut={signOut}
+    />}
+  </div>;
+}
+
+function initials(name:string) {
+  return name.split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase();
+}
+
+function AuthModal({user,onClose,onAuthenticated,onGuest,onSignOut}:{user:AppUser|null;onClose:()=>void;onAuthenticated:(user:AppUser)=>void;onGuest:()=>void;onSignOut:()=>void}) {
+  const [mode,setMode] = useState<'login'|'register'>('login');
+  const [name,setName] = useState('');
+  const [email,setEmail] = useState('');
+  const [password,setPassword] = useState('');
+  const [showPassword,setShowPassword] = useState(false);
+  const [busy,setBusy] = useState(false);
+  const [message,setMessage] = useState('');
+
+  async function submit(event:React.FormEvent) {
+    event.preventDefault(); setBusy(true); setMessage('');
+    try {
+      const response = await fetch(`/api/auth/${mode==='login'?'login':'register'}`, {
+        method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(mode==='login'?{email,password}:{name,email,password})
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail||'Authentication failed.');
+      onAuthenticated(data.user);
+    } catch (error) { setMessage(error instanceof Error?error.message:'Authentication failed.'); }
+    finally { setBusy(false); }
+  }
+
+  return <div className="auth-backdrop" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div className="auth-modal">
+      <button className="auth-close" onClick={onClose} aria-label="Close"><X size={18}/></button>
+      <div className="auth-brand"><img src={firewatchLogo} alt="FIREWATCH AI logo"/><span><b>FIREWATCH <em>AI</em></b><small>SECURE ANALYST ACCESS</small></span></div>
+      {user ? <div className="account-view"><span className="account-avatar">{initials(user.name)}</span><h2 id="auth-title">Welcome back, {user.name}</h2><p>{user.email}</p><button className="auth-primary" onClick={onClose}>Continue to dashboard <ArrowUpRight size={15}/></button><button className="auth-secondary" onClick={onSignOut}><LogOut size={15}/> Sign out</button></div> : <>
+        <span className="auth-kicker"><ShieldCheck size={14}/> POSTGRESQL-BACKED ACCOUNT</span>
+        <h2 id="auth-title">{mode==='login'?'Welcome back.':'Create your workspace.'}</h2>
+        <p className="auth-copy">{mode==='login'?'Sign in to personalize your FIREWATCH AI research session.':'Create a secure analyst profile. The public NASA data dashboard remains available to guests.'}</p>
+        <div className="auth-tabs"><button className={mode==='login'?'active':''} onClick={()=>{setMode('login');setMessage('')}}><LogIn size={14}/> Sign in</button><button className={mode==='register'?'active':''} onClick={()=>{setMode('register');setMessage('')}}><UserPlus size={14}/> Create account</button></div>
+        <form onSubmit={submit}>
+          {mode==='register'&&<label><span>Full name</span><div><UserPlus size={15}/><input value={name} onChange={e=>setName(e.target.value)} autoComplete="name" required minLength={2} placeholder="Firewatch analyst"/></div></label>}
+          <label><span>Email address</span><div><Mail size={15}/><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required placeholder="analyst@example.com"/></div></label>
+          <label><span>Password</span><div><ShieldCheck size={15}/><input type={showPassword?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} autoComplete={mode==='login'?'current-password':'new-password'} required minLength={8} placeholder="Minimum 8 characters"/><button type="button" onClick={()=>setShowPassword(value=>!value)} aria-label={showPassword?'Hide password':'Show password'}>{showPassword?<EyeOff size={15}/>:<Eye size={15}/>}</button></div></label>
+          {message&&<div className="auth-error"><AlertTriangle size={14}/>{message}</div>}
+          <button className="auth-primary" disabled={busy}>{busy?'Please wait…':mode==='login'?'Sign in securely':'Create secure account'} <ArrowUpRight size={15}/></button>
+        </form>
+        <div className="auth-divider"><span>or</span></div>
+        <button className="auth-guest" onClick={onGuest}>Continue as guest <ChevronRight size={15}/></button>
+        <small className="auth-note">Passwords are salted and hashed. Sessions use secure, HTTP-only cookies.</small>
+      </>}
+    </div>
   </div>;
 }
 

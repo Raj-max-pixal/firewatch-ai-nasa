@@ -6,7 +6,7 @@ import statistics
 from contextlib import asynccontextmanager
 from pathlib import Path
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response as FastAPIResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +19,7 @@ from .firms import fetch_firms
 from .gemini import generate_fire_analysis
 from .harmonization import aggregate_activity, harmonize, records
 from . import database
+from . import auth
 
 
 @asynccontextmanager
@@ -34,7 +35,70 @@ app.add_middleware(
     allow_origins=[v.strip() for v in settings.allowed_origins.split(",")],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
+
+AUTH_COOKIE = "firewatch_session"
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class RegisterRequest(LoginRequest):
+    name: str
+
+
+def set_auth_cookie(response: FastAPIResponse, token: str, request: Request) -> None:
+    response.set_cookie(
+        AUTH_COOKIE,
+        token,
+        max_age=auth.SESSION_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/",
+    )
+
+
+@app.post("/api/auth/register")
+def register(payload: RegisterRequest, request: Request, response: FastAPIResponse):
+    if not database.enabled():
+        raise HTTPException(503, "Account storage is not configured.")
+    try:
+        user = auth.create_user(payload.name, payload.email, payload.password)
+    except ValueError as exc:
+        status = 409 if "already exists" in str(exc) else 400
+        raise HTTPException(status, str(exc)) from exc
+    set_auth_cookie(response, auth.create_session(user["id"]), request)
+    return {"user": user}
+
+
+@app.post("/api/auth/login")
+def login(payload: LoginRequest, request: Request, response: FastAPIResponse):
+    if not database.enabled():
+        raise HTTPException(503, "Account storage is not configured.")
+    user = auth.authenticate(payload.email, payload.password)
+    if not user:
+        raise HTTPException(401, "Incorrect email or password.")
+    set_auth_cookie(response, auth.create_session(user["id"]), request)
+    return {"user": user}
+
+
+@app.get("/api/auth/me")
+def current_user(request: Request):
+    if not database.enabled():
+        return {"user": None}
+    return {"user": auth.user_for_session(request.cookies.get(AUTH_COOKIE))}
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request, response: FastAPIResponse):
+    if database.enabled():
+        auth.delete_session(request.cookies.get(AUTH_COOKIE))
+    response.delete_cookie(AUTH_COOKIE, path="/")
+    return {"status": "signed_out"}
 
 
 def sample_data() -> pd.DataFrame:
